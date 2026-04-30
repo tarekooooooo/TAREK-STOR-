@@ -23,6 +23,8 @@ export default function Navbar({
   const t = messages.common;
   const isRtl = locale === "ar";
 
+  const isAdmin = session?.user?.role === "admin" || session?.user?.role === "superadmin";
+
   return (
     <nav className="bg-gradient-to-r from-indigo-600 to-purple-600 text-white shadow-lg sticky top-0 z-50">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
@@ -39,13 +41,16 @@ export default function Navbar({
             <Link href="/store" className="hover:text-indigo-200 transition">
               {t.store}
             </Link>
+            <Link href="/tournaments" className="hover:text-indigo-200 transition">
+              {locale === "ar" ? "البطولات" : locale === "fr" ? "Tournois" : "Tournaments"}
+            </Link>
 
             {session ? (
               <>
                 <Link href="/profile" className="hover:text-indigo-200 transition">
                   {t.profile}
                 </Link>
-                {session.user.role === "admin" && (
+                {isAdmin && (
                   <Link
                     href="/admin"
                     className="bg-white/20 px-3 py-1 rounded-full hover:bg-white/30 transition"
@@ -130,12 +135,15 @@ export default function Navbar({
             <Link href="/store" className="block py-2 hover:text-indigo-200" onClick={() => setMenuOpen(false)}>
               {t.store}
             </Link>
+            <Link href="/tournaments" className="block py-2 hover:text-indigo-200" onClick={() => setMenuOpen(false)}>
+              {locale === "ar" ? "البطولات" : locale === "fr" ? "Tournois" : "Tournaments"}
+            </Link>
             {session ? (
               <>
                 <Link href="/profile" className="block py-2 hover:text-indigo-200" onClick={() => setMenuOpen(false)}>
                   {t.profile}
                 </Link>
-                {session.user.role === "admin" && (
+                {isAdmin && (
                   <Link href="/admin" className="block py-2 hover:text-indigo-200" onClick={() => setMenuOpen(false)}>
                     {t.admin}
                   </Link>
@@ -154,7 +162,9 @@ export default function Navbar({
                 </Link>
               </>
             )}
-            <div className="flex gap-2 pt-2">
+
+            {/* Language switcher mobile */}
+            <div className="pt-2 border-t border-white/20 flex gap-2">
               {Object.entries(localeNames).map(([code, name]) => (
                 <button
                   key={code}

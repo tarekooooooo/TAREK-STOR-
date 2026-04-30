@@ -9,24 +9,27 @@ datasource db {
 
 model User {
   id            String    @id @default(cuid())
-  uniqueId      String    @unique // 6-digit unique ID
+  uniqueId      String    @unique // 6-digit numeric unique ID
   name          String?
   email         String    @unique
   emailVerified DateTime?
   password      String?
   image         String?
-  role          String    @default("user") // "user" or "admin"
+  role          String    @default("user") // "superadmin", "admin", "merchant", "user"
   country       String?
   currency      String?
   locale        String    @default("ar")
   createdAt     DateTime  @default(now())
   updatedAt     DateTime  @updatedAt
 
-  accounts Account[]
-  sessions Session[]
-  wallet   Wallet?
-  orders   Order[]
-  visits   Visit[]
+  accounts      Account[]
+  sessions      Session[]
+  wallet        Wallet?
+  orders        Order[]
+  visits        Visit[]
+  reviews       Review[]
+  tournamentParticipants TournamentParticipant[]
+  subAdminPermissions    SubAdminPermission?
 }
 
 model Account {
@@ -77,14 +80,15 @@ model Wallet {
 }
 
 model WalletTransaction {
-  id          String   @id @default(cuid())
-  walletId    String
-  type        String   // "recharge", "purchase", "refund"
-  amount      Float
-  description String?
-  orderId     String?
+  id           String   @id @default(cuid())
+  walletId     String
+  type         String   // "recharge", "purchase", "refund", "reward", "cashback"
+  amount       Float
+  description  String?
+  orderId      String?
   redeemCodeId String?
-  createdAt   DateTime @default(now())
+  status       String   @default("completed") // "completed", "pending", "failed"
+  createdAt    DateTime @default(now())
 
   wallet Wallet @relation(fields: [walletId], references: [id], onDelete: Cascade)
 }
@@ -96,6 +100,7 @@ model RedeemCode {
   isUsed    Boolean   @default(false)
   usedBy    String?   // user uniqueId
   usedAt    DateTime?
+  usedIp    String?
   createdAt DateTime  @default(now())
 }
 
@@ -115,10 +120,25 @@ model Product {
   countries       String?  // comma-separated country codes, null = all
   isActive        Boolean  @default(true)
   stock           Int      @default(-1) // -1 = unlimited
+  salesCount      Int      @default(0)
   createdAt       DateTime @default(now())
   updatedAt       DateTime @updatedAt
 
-  orders OrderItem[]
+  orders  OrderItem[]
+  reviews Review[]
+  keys    ProductKey[]
+}
+
+model ProductKey {
+  id        String    @id @default(cuid())
+  productId String
+  keyValue  String
+  isSold    Boolean   @default(false)
+  soldAt    DateTime?
+  soldTo    String?   // user uniqueId
+  createdAt DateTime  @default(now())
+
+  product Product @relation(fields: [productId], references: [id], onDelete: Cascade)
 }
 
 model Order {
@@ -162,4 +182,131 @@ model ExchangeRate {
   currency  String   @unique
   rate      Float    // rate relative to USD
   updatedAt DateTime @updatedAt
+}
+
+model Review {
+  id        String   @id @default(cuid())
+  userId    String
+  productId String
+  rating    Int      // 1-5
+  comment   String?
+  createdAt DateTime @default(now())
+
+  user    User    @relation(fields: [userId], references: [id], onDelete: Cascade)
+  product Product @relation(fields: [productId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, productId])
+}
+
+// System Settings (toggle switches)
+model Setting {
+  id    String @id @default(cuid())
+  key   String @unique
+  value String @default("true") // "true" or "false" for booleans, or other values
+  label String? // display label
+  group String? // group name for UI
+}
+
+// Sub-admin permissions
+model SubAdminPermission {
+  id     String @id @default(cuid())
+  userId String @unique
+
+  manageProducts      Boolean @default(false)
+  manageOrders        Boolean @default(false)
+  manageUsers         Boolean @default(false)
+  manageRedeemCodes   Boolean @default(false)
+  manageAnalytics     Boolean @default(false)
+  manageTournaments   Boolean @default(false)
+  manageSettings      Boolean @default(false)
+  viewRevenue         Boolean @default(false)
+  manageWallets       Boolean @default(false)
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+}
+
+// Tournament system
+model Tournament {
+  id              String   @id @default(cuid())
+  name            String
+  nameEn          String?
+  nameFr          String?
+  description     String?
+  descriptionEn   String?
+  descriptionFr   String?
+  type            String   // "classic" (100 players) or "warehouse" (8 players)
+  participationType String // "solo", "duo", "squad"
+  maxPlayers      Int      @default(100)
+  entryFee        Float    @default(0) // 0 = free
+  prize           Float    @default(0) // 0 = no prize
+  hasReward       Boolean  @default(false)
+  rewardDescription String?
+  status          String   @default("open") // "open", "full", "in_progress", "completed", "cancelled"
+  rules           String?  // tournament rules text
+  roomId          String?  // game room ID
+  roomPassword    String?  // game room password
+  startDate       DateTime?
+  endDate         DateTime?
+  image           String?
+  city            String?
+  country         String?
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  participants TournamentParticipant[]
+  results      TournamentResult[]
+}
+
+model TournamentParticipant {
+  id           String   @id @default(cuid())
+  tournamentId String
+  userId       String
+  teamCode     String?  // for duo/squad - team join code
+  teamName     String?
+  isLeader     Boolean  @default(false)
+  gameId       String?  // in-game ID (e.g. PUBG ID)
+  status       String   @default("registered") // "registered", "checked_in", "eliminated", "winner"
+  createdAt    DateTime @default(now())
+
+  tournament Tournament @relation(fields: [tournamentId], references: [id], onDelete: Cascade)
+  user       User       @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([tournamentId, userId])
+}
+
+model TournamentResult {
+  id           String @id @default(cuid())
+  tournamentId String
+  rank         Int
+  playerName   String?
+  playerUid    String? // 6-digit user ID
+  kills        Int     @default(0)
+  prize        Float   @default(0)
+  createdAt    DateTime @default(now())
+
+  tournament Tournament @relation(fields: [tournamentId], references: [id], onDelete: Cascade)
+}
+
+// SMTP and notification settings
+model SmtpConfig {
+  id       String @id @default(cuid())
+  host     String @default("")
+  port     Int    @default(587)
+  username String @default("")
+  apiKey   String @default("")
+  fromName String @default("Tarek Store")
+  fromEmail String @default("")
+  isActive Boolean @default(false)
+}
+
+// Audit log for security
+model AuditLog {
+  id        String   @id @default(cuid())
+  userId    String?
+  userUid   String?
+  action    String   // "login", "price_change", "api_call", "settings_change", etc.
+  details   String?
+  ip        String?
+  userAgent String?
+  createdAt DateTime @default(now())
 }

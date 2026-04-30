@@ -4,12 +4,12 @@ import { useSession } from "next-auth/react";
 import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
 
-
 interface WalletTransaction {
   id: string;
   type: string;
   amount: number;
   description: string | null;
+  status: string;
   createdAt: string;
 }
 
@@ -33,6 +33,20 @@ interface Order {
   items: OrderItem[];
 }
 
+const typeLabels: Record<string, { label: string; color: string; icon: string }> = {
+  recharge: { label: "شحن", color: "text-green-600", icon: "+" },
+  purchase: { label: "شراء", color: "text-red-600", icon: "-" },
+  refund: { label: "استرداد", color: "text-blue-600", icon: "+" },
+  reward: { label: "مكافأة", color: "text-yellow-600", icon: "+" },
+  cashback: { label: "كاش باك", color: "text-purple-600", icon: "+" },
+};
+
+const statusLabels: Record<string, { label: string; color: string }> = {
+  completed: { label: "مكتمل", color: "bg-green-100 text-green-700" },
+  pending: { label: "معلق", color: "bg-yellow-100 text-yellow-700" },
+  failed: { label: "فشل", color: "bg-red-100 text-red-700" },
+};
+
 export default function ProfilePage() {
   const { data: session, status } = useSession();
   const router = useRouter();
@@ -42,6 +56,7 @@ export default function ProfilePage() {
   const [redeemMsg, setRedeemMsg] = useState("");
   const [redeemError, setRedeemError] = useState("");
   const [activeTab, setActiveTab] = useState<"wallet" | "orders" | "transactions">("wallet");
+
   useEffect(() => {
     if (status === "unauthenticated") {
       router.push("/auth/login");
@@ -100,6 +115,11 @@ export default function ProfilePage() {
             <p className="text-indigo-200 mt-1">
               رقم التعريف: <span className="font-mono bg-white/20 px-2 py-1 rounded">{session.user.uniqueId}</span>
             </p>
+            {(session.user.role === "admin" || session.user.role === "superadmin") && (
+              <span className="inline-block mt-2 bg-yellow-400 text-yellow-900 px-3 py-1 rounded-full text-xs font-bold">
+                {session.user.role === "superadmin" ? "المسؤول الرئيسي" : "مساعد إداري"}
+              </span>
+            )}
           </div>
         </div>
       </div>
@@ -153,41 +173,56 @@ export default function ProfilePage() {
                   : "text-gray-500 hover:text-gray-700"
               }`}
             >
-              {tab === "wallet" ? "المحفظة" : tab === "orders" ? "طلباتي" : "المعاملات"}
+              {tab === "wallet" ? "💰 المحفظة" : tab === "orders" ? "🛒 الطلبات" : "📋 سجل المعاملات"}
             </button>
           ))}
         </div>
 
         <div className="p-6">
+          {activeTab === "wallet" && (
+            <div className="space-y-4">
+              <div className="grid grid-cols-2 gap-4">
+                <div className="bg-green-50 rounded-xl p-4 text-center">
+                  <p className="text-2xl font-bold text-green-600">
+                    ${wallet?.transactions?.filter((t) => t.amount > 0).reduce((s, t) => s + t.amount, 0).toFixed(2) || "0.00"}
+                  </p>
+                  <p className="text-sm text-gray-500">إجمالي الشحن</p>
+                </div>
+                <div className="bg-red-50 rounded-xl p-4 text-center">
+                  <p className="text-2xl font-bold text-red-600">
+                    ${Math.abs(wallet?.transactions?.filter((t) => t.amount < 0).reduce((s, t) => s + t.amount, 0) || 0).toFixed(2)}
+                  </p>
+                  <p className="text-sm text-gray-500">إجمالي المشتريات</p>
+                </div>
+              </div>
+            </div>
+          )}
+
           {activeTab === "orders" && (
             <div className="space-y-4">
               {orders.length === 0 ? (
-                <p className="text-gray-500 text-center py-8">لا توجد طلبات</p>
+                <p className="text-gray-500 text-center py-8">لا توجد طلبات بعد</p>
               ) : (
                 orders.map((order) => (
-                  <div key={order.id} className="border rounded-lg p-4">
-                    <div className="flex justify-between items-center mb-2">
-                      <span className="font-mono text-sm text-gray-500">#{order.id.slice(-8)}</span>
-                      <span className={`px-3 py-1 rounded-full text-xs font-medium ${
-                        order.status === "completed"
-                          ? "bg-green-100 text-green-700"
-                          : "bg-yellow-100 text-yellow-700"
+                  <div key={order.id} className="bg-gray-50 rounded-xl p-4">
+                    <div className="flex items-center justify-between mb-2">
+                      <span className="font-mono text-xs text-gray-400">#{order.id.slice(-8)}</span>
+                      <span className={`px-2 py-1 rounded-full text-xs ${
+                        order.status === "completed" ? "bg-green-100 text-green-700" : "bg-yellow-100 text-yellow-700"
                       }`}>
                         {order.status === "completed" ? "مكتمل" : "معلق"}
                       </span>
                     </div>
-                    <div className="space-y-1">
-                      {order.items.map((item) => (
-                        <p key={item.id} className="text-sm">
-                          {item.product.name} × {item.quantity} - ${item.price}
-                        </p>
-                      ))}
-                    </div>
-                    <div className="flex justify-between items-center mt-2 pt-2 border-t">
-                      <span className="font-bold">${order.total}</span>
-                      <span className="text-sm text-gray-500">
+                    {order.items.map((item) => (
+                      <p key={item.id} className="text-sm">
+                        {item.product.name} × {item.quantity} — <span className="font-bold">${item.price}</span>
+                      </p>
+                    ))}
+                    <div className="flex items-center justify-between mt-2 pt-2 border-t">
+                      <span className="text-xs text-gray-400">
                         {new Date(order.createdAt).toLocaleDateString("ar")}
                       </span>
+                      <span className="font-bold text-indigo-600">${order.total}</span>
                     </div>
                   </div>
                 ))
@@ -196,36 +231,42 @@ export default function ProfilePage() {
           )}
 
           {activeTab === "transactions" && (
-            <div className="space-y-3">
-              {wallet?.transactions?.length === 0 ? (
-                <p className="text-gray-500 text-center py-8">لا توجد معاملات</p>
+            <div className="space-y-2">
+              {!wallet?.transactions?.length ? (
+                <p className="text-gray-500 text-center py-8">لا توجد معاملات بعد</p>
               ) : (
-                wallet?.transactions?.map((tx) => (
-                  <div key={tx.id} className="flex items-center justify-between border-b pb-3">
-                    <div>
-                      <p className="font-medium">
-                        {tx.type === "recharge" ? "شحن رصيد" : tx.type === "purchase" ? "عملية شراء" : "استرداد"}
-                      </p>
-                      <p className="text-sm text-gray-500">{tx.description}</p>
-                      <p className="text-xs text-gray-400">
-                        {new Date(tx.createdAt).toLocaleDateString("ar")}
-                      </p>
-                    </div>
-                    <span className={`font-bold ${tx.amount > 0 ? "text-green-600" : "text-red-600"}`}>
-                      {tx.amount > 0 ? "+" : ""}${Math.abs(tx.amount).toFixed(2)}
-                    </span>
-                  </div>
-                ))
-              )}
-            </div>
-          )}
+                wallet.transactions.map((tx) => {
+                  const info = typeLabels[tx.type] || { label: tx.type, color: "text-gray-600", icon: "" };
+                  const statusInfo = statusLabels[tx.status] || statusLabels.completed;
 
-          {activeTab === "wallet" && (
-            <div className="text-center py-8">
-              <p className="text-5xl font-bold text-indigo-600 mb-2">
-                ${wallet?.balance?.toFixed(2) || "0.00"}
-              </p>
-              <p className="text-gray-500">رصيدك المتاح للتسوق</p>
+                  return (
+                    <div key={tx.id} className="flex items-center justify-between p-4 bg-gray-50 rounded-xl hover:bg-gray-100 transition">
+                      <div className="flex items-center gap-3">
+                        <div className={`w-10 h-10 rounded-full flex items-center justify-center text-lg font-bold ${
+                          tx.amount > 0 ? "bg-green-100 text-green-600" : "bg-red-100 text-red-600"
+                        }`}>
+                          {info.icon}
+                        </div>
+                        <div>
+                          <p className="font-medium text-sm">{info.label}</p>
+                          <p className="text-xs text-gray-400">{tx.description || "—"}</p>
+                          <p className="text-xs text-gray-300">
+                            {new Date(tx.createdAt).toLocaleString("ar")}
+                          </p>
+                        </div>
+                      </div>
+                      <div className="text-left">
+                        <p className={`font-bold ${info.color}`}>
+                          {tx.amount > 0 ? "+" : ""}{tx.amount.toFixed(2)}$
+                        </p>
+                        <span className={`text-xs px-2 py-0.5 rounded-full ${statusInfo.color}`}>
+                          {statusInfo.label}
+                        </span>
+                      </div>
+                    </div>
+                  );
+                })
+              )}
             </div>
           )}
         </div>

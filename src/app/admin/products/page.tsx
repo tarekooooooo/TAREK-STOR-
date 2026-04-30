@@ -34,6 +34,7 @@ export default function AdminProductsPage() {
   const [editingId, setEditingId] = useState<string | null>(null);
   const [form, setForm] = useState(emptyProduct);
   const [saving, setSaving] = useState(false);
+  const [error, setError] = useState("");
 
   const fetchProducts = () => {
     fetch("/api/products")
@@ -49,6 +50,7 @@ export default function AdminProductsPage() {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setSaving(true);
+    setError("");
 
     const body = {
       ...form,
@@ -63,20 +65,27 @@ export default function AdminProductsPage() {
       descriptionFr: form.descriptionFr || null,
     };
 
-    const url = editingId ? `/api/products/${editingId}` : "/api/products";
-    const method = editingId ? "PUT" : "POST";
+    try {
+      const url = editingId ? `/api/products/${editingId}` : "/api/products";
+      const method = editingId ? "PUT" : "POST";
 
-    const res = await fetch(url, {
-      method,
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(body),
-    });
+      const res = await fetch(url, {
+        method,
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(body),
+      });
 
-    if (res.ok) {
-      setShowForm(false);
-      setEditingId(null);
-      setForm(emptyProduct);
-      fetchProducts();
+      if (res.ok) {
+        setShowForm(false);
+        setEditingId(null);
+        setForm(emptyProduct);
+        fetchProducts();
+      } else {
+        const data = await res.json();
+        setError(data.error || "حدث خطأ أثناء حفظ المنتج");
+      }
+    } catch {
+      setError("حدث خطأ في الاتصال. يرجى المحاولة مرة أخرى.");
     }
     setSaving(false);
   };
@@ -183,6 +192,12 @@ export default function AdminProductsPage() {
             />
             <label className="text-sm font-medium">مفعل</label>
           </div>
+
+          {error && (
+            <div className="bg-red-50 border border-red-200 text-red-600 px-4 py-3 rounded-lg text-sm">
+              {error}
+            </div>
+          )}
 
           <button
             type="submit"
