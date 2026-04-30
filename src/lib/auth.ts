@@ -3,6 +3,8 @@ import CredentialsProvider from "next-auth/providers/credentials";
 import { prisma } from "./prisma";
 import bcrypt from "bcryptjs";
 
+const SUPER_ADMIN_EMAIL = "tarekai042@gmail.com";
+
 function generateUniqueId(): string {
   return Math.floor(100000 + Math.random() * 900000).toString();
 }
@@ -61,4 +63,4 @@ export const authOptions: NextAuthOptions = {
   secret: process.env.NEXTAUTH_SECRET || "tarek-store-secret-key-change-in-production",
 };
 
-export { generateUniqueId };
+export { generateUniqueId, SUPER_ADMIN_EMAIL };

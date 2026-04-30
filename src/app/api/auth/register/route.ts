@@ -1,10 +1,16 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import bcrypt from "bcryptjs";
-import { generateUniqueId } from "@/lib/auth";
+import { generateUniqueId, SUPER_ADMIN_EMAIL } from "@/lib/auth";
 
 export async function POST(req: NextRequest) {
   try {
+    // Check if registration is enabled
+    const regSetting = await prisma.setting.findUnique({ where: { key: "registration_enabled" } });
+    if (regSetting && regSetting.value === "false") {
+      return NextResponse.json({ error: "Registration is currently disabled" }, { status: 403 });
+    }
+
     const { name, email, password } = await req.json();
 
     if (!email || !password || !name) {
@@ -29,7 +35,13 @@ export async function POST(req: NextRequest) {
 
     const hashedPassword = await bcrypt.hash(password, 12);
 
-    const isAdmin = email === "tarekai042@gmail.com";
+    const isSuperAdmin = email === SUPER_ADMIN_EMAIL;
+
+    // Check for registration bonus
+    const bonusSetting = await prisma.setting.findUnique({ where: { key: "registration_bonus_enabled" } });
+    const bonusAmountSetting = await prisma.setting.findUnique({ where: { key: "registration_bonus_amount" } });
+    const bonusEnabled = bonusSetting?.value === "true";
+    const bonusAmount = bonusEnabled ? Number(bonusAmountSetting?.value || 0) : 0;
 
     const user = await prisma.user.create({
       data: {
@@ -37,11 +49,25 @@ export async function POST(req: NextRequest) {
         email,
         password: hashedPassword,
         uniqueId,
-        role: isAdmin ? "admin" : "user",
-        wallet: { create: { balance: 0 } },
+        role: isSuperAdmin ? "superadmin" : "user",
+        wallet: { create: { balance: bonusAmount } },
       },
       select: { id: true, uniqueId: true, name: true, email: true, role: true },
     });
+
+    if (bonusAmount > 0) {
+      const wallet = await prisma.wallet.findUnique({ where: { userId: user.id } });
+      if (wallet) {
+        await prisma.walletTransaction.create({
+          data: {
+            walletId: wallet.id,
+            type: "reward",
+            amount: bonusAmount,
+            description: "Registration bonus",
+          },
+        });
+      }
+    }
 
     return NextResponse.json(user, { status: 201 });
   } catch (error) {

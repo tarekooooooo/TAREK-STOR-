@@ -3,14 +3,27 @@ import { prisma } from "@/lib/prisma";
 import { getServerSession } from "next-auth";
 import { authOptions } from "@/lib/auth";
 
-export async function GET() {
+export async function GET(req: NextRequest) {
   try {
     const session = await getServerSession(authOptions);
-    if (!session || session.user.role !== "admin") {
+    if (!session || (session.user.role !== "admin" && session.user.role !== "superadmin")) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
+    const { searchParams } = new URL(req.url);
+    const search = searchParams.get("search");
+
+    const where: Record<string, unknown> = {};
+    if (search) {
+      where.OR = [
+        { name: { contains: search } },
+        { email: { contains: search } },
+        { uniqueId: { contains: search } },
+      ];
+    }
+
     const users = await prisma.user.findMany({
+      where,
       include: { wallet: true, _count: { select: { orders: true } } },
       orderBy: { createdAt: "desc" },
     });
