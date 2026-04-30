@@ -115,6 +115,24 @@ export async function PUT(req: NextRequest) {
       return NextResponse.json({ error: "Already registered" }, { status: 400 });
     }
 
+    let generatedTeamCode = teamCode;
+    const isLeader = !teamCode && tournament.participationType !== "solo";
+
+    if (isLeader) {
+      generatedTeamCode = crypto.randomBytes(4).toString("hex").toUpperCase();
+    }
+
+    if (teamCode && tournament.participationType !== "solo") {
+      const teamMembers = await prisma.tournamentParticipant.count({
+        where: { tournamentId, teamCode },
+      });
+
+      const maxTeamSize = tournament.participationType === "duo" ? 2 : 4;
+      if (teamMembers >= maxTeamSize) {
+        return NextResponse.json({ error: "Team is full" }, { status: 400 });
+      }
+    }
+
     if (tournament.entryFee > 0) {
       const wallet = await prisma.wallet.findUnique({
         where: { userId: session.user.id },
@@ -138,24 +156,6 @@ export async function PUT(req: NextRequest) {
           },
         }),
       ]);
-    }
-
-    let generatedTeamCode = teamCode;
-    const isLeader = !teamCode && tournament.participationType !== "solo";
-
-    if (isLeader) {
-      generatedTeamCode = crypto.randomBytes(4).toString("hex").toUpperCase();
-    }
-
-    if (teamCode && tournament.participationType !== "solo") {
-      const teamMembers = await prisma.tournamentParticipant.count({
-        where: { tournamentId, teamCode },
-      });
-
-      const maxTeamSize = tournament.participationType === "duo" ? 2 : 4;
-      if (teamMembers >= maxTeamSize) {
-        return NextResponse.json({ error: "Team is full" }, { status: 400 });
-      }
     }
 
     const participant = await prisma.tournamentParticipant.create({

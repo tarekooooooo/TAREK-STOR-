@@ -10,7 +10,7 @@ export async function GET() {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
-    const isAdmin = session.user.role === "admin";
+    const isAdmin = session.user.role === "admin" || session.user.role === "superadmin";
     const orders = await prisma.order.findMany({
       where: isAdmin ? {} : { userId: session.user.id },
       include: { items: { include: { product: true } }, user: true },
