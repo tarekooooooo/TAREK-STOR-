@@ -1,18 +1,16 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
-import { getServerSession } from "next-auth";
-import { authOptions } from "@/lib/auth";
+import { getAuthUser, isAdmin } from "@/lib/apiAuth";
 
-export async function GET() {
+export async function GET(req: NextRequest) {
   try {
-    const session = await getServerSession(authOptions);
-    if (!session) {
+    const user = await getAuthUser(req);
+    if (!user) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
-    const isAdmin = session.user.role === "admin" || session.user.role === "superadmin";
     const orders = await prisma.order.findMany({
-      where: isAdmin ? {} : { userId: session.user.id },
+      where: isAdmin(user) ? {} : { userId: user.id },
       include: { items: { include: { product: true } }, user: true },
       orderBy: { createdAt: "desc" },
       take: 100,
@@ -27,8 +25,8 @@ export async function GET() {
 
 export async function POST(req: NextRequest) {
   try {
-    const session = await getServerSession(authOptions);
-    if (!session) {
+    const user = await getAuthUser(req);
+    if (!user) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
@@ -46,7 +44,7 @@ export async function POST(req: NextRequest) {
     const total = product.price * quantity;
 
     const wallet = await prisma.wallet.findUnique({
-      where: { userId: session.user.id },
+      where: { userId: user.id },
     });
 
     if (!wallet || wallet.balance < total) {
@@ -56,8 +54,8 @@ export async function POST(req: NextRequest) {
     const order = await prisma.$transaction(async (tx) => {
       const newOrder = await tx.order.create({
         data: {
-          userId: session.user.id,
-          userUid: session.user.uniqueId,
+          userId: user.id,
+          userUid: user.uniqueId,
           total,
           status: "completed",
           items: {

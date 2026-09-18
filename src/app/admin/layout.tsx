@@ -16,6 +16,7 @@ const adminLinks = [
   { href: "/admin/tournaments", label: "البطولات", icon: "🏆" },
   { href: "/admin/settings", label: "الإعدادات", icon: "⚙️" },
   { href: "/admin/smtp", label: "البريد/SMTP", icon: "📧" },
+  { href: "/admin/support", label: "خدمة العملاء", icon: "💬" },
   { href: "/admin/sub-admins", label: "المساعدون", icon: "🔑" },
   { href: "/admin/analytics", label: "الإحصائيات", icon: "📈" },
 ];
