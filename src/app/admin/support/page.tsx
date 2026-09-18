@@ -62,6 +62,13 @@ export default function AdminSupportPage() {
       const message = await res.json();
       setMessages((prev) => [...prev, message]);
       setReply("");
+      setTickets((prev) =>
+        prev.map((ticket) =>
+          ticket.id === selected.id
+            ? { ...ticket, _count: { messages: ticket._count.messages + 1 } }
+            : ticket
+        )
+      );
     }
   };
 
