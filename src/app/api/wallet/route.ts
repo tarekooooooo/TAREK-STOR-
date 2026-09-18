@@ -1,17 +1,16 @@
-import { NextResponse } from "next/server";
+import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
-import { getServerSession } from "next-auth";
-import { authOptions } from "@/lib/auth";
+import { getAuthUser } from "@/lib/apiAuth";
 
-export async function GET() {
+export async function GET(req: NextRequest) {
   try {
-    const session = await getServerSession(authOptions);
-    if (!session) {
+    const user = await getAuthUser(req);
+    if (!user) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
     const wallet = await prisma.wallet.findUnique({
-      where: { userId: session.user.id },
+      where: { userId: user.id },
       include: {
         transactions: { orderBy: { createdAt: "desc" }, take: 50 },
       },
@@ -19,7 +18,7 @@ export async function GET() {
 
     if (!wallet) {
       const newWallet = await prisma.wallet.create({
-        data: { userId: session.user.id, balance: 0 },
+        data: { userId: user.id, balance: 0 },
         include: { transactions: true },
       });
       return NextResponse.json(newWallet);

@@ -1,7 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
-import { getServerSession } from "next-auth";
-import { authOptions } from "@/lib/auth";
+import { getAuthUser, isAdmin } from "@/lib/apiAuth";
 import crypto from "crypto";
 
 export async function GET(req: NextRequest) {
@@ -36,8 +35,8 @@ export async function GET(req: NextRequest) {
 
 export async function POST(req: NextRequest) {
   try {
-    const session = await getServerSession(authOptions);
-    if (!session || (session.user.role !== "admin" && session.user.role !== "superadmin")) {
+    const admin = await getAuthUser(req);
+    if (!isAdmin(admin)) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
@@ -78,8 +77,8 @@ export async function POST(req: NextRequest) {
 
 export async function PUT(req: NextRequest) {
   try {
-    const session = await getServerSession(authOptions);
-    if (!session) {
+    const user = await getAuthUser(req);
+    if (!user) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
@@ -106,7 +105,7 @@ export async function PUT(req: NextRequest) {
       where: {
         tournamentId_userId: {
           tournamentId,
-          userId: session.user.id,
+          userId: user.id,
         },
       },
     });
@@ -135,7 +134,7 @@ export async function PUT(req: NextRequest) {
 
     if (tournament.entryFee > 0) {
       const wallet = await prisma.wallet.findUnique({
-        where: { userId: session.user.id },
+        where: { userId: user.id },
       });
 
       if (!wallet || wallet.balance < tournament.entryFee) {
@@ -161,7 +160,7 @@ export async function PUT(req: NextRequest) {
     const participant = await prisma.tournamentParticipant.create({
       data: {
         tournamentId,
-        userId: session.user.id,
+        userId: user.id,
         teamCode: generatedTeamCode || null,
         isLeader,
         gameId: gameId || null,

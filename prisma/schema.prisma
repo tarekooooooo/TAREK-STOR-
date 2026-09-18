@@ -30,6 +30,8 @@ model User {
   reviews       Review[]
   tournamentParticipants TournamentParticipant[]
   subAdminPermissions    SubAdminPermission?
+  supportTickets         SupportTicket[]
+  supportMessages        SupportMessage[]
 }
 
 model Account {
@@ -221,8 +223,33 @@ model SubAdminPermission {
   manageSettings      Boolean @default(false)
   viewRevenue         Boolean @default(false)
   manageWallets       Boolean @default(false)
+  manageSupport       Boolean @default(false)
 
   user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+}
+
+// Customer support system
+model SupportTicket {
+  id        String   @id @default(cuid())
+  userId    String
+  subject   String
+  status    String   @default("open") // "open", "closed"
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  user     User             @relation(fields: [userId], references: [id], onDelete: Cascade)
+  messages SupportMessage[]
+}
+
+model SupportMessage {
+  id        String   @id @default(cuid())
+  ticketId  String
+  senderId  String
+  body      String
+  createdAt DateTime @default(now())
+
+  ticket SupportTicket @relation(fields: [ticketId], references: [id], onDelete: Cascade)
+  sender User          @relation(fields: [senderId], references: [id], onDelete: Cascade)
 }
 
 // Tournament system

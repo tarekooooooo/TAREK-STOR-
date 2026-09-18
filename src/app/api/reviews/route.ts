@@ -1,7 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
-import { getServerSession } from "next-auth";
-import { authOptions } from "@/lib/auth";
+import { getAuthUser } from "@/lib/apiAuth";
 
 export async function GET(req: NextRequest) {
   try {
@@ -29,8 +28,8 @@ export async function GET(req: NextRequest) {
 
 export async function POST(req: NextRequest) {
   try {
-    const session = await getServerSession(authOptions);
-    if (!session) {
+    const user = await getAuthUser(req);
+    if (!user) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
@@ -43,7 +42,7 @@ export async function POST(req: NextRequest) {
     const hasPurchased = await prisma.orderItem.findFirst({
       where: {
         productId,
-        order: { userId: session.user.id, status: "completed" },
+        order: { userId: user.id, status: "completed" },
       },
     });
 
@@ -57,13 +56,13 @@ export async function POST(req: NextRequest) {
     const review = await prisma.review.upsert({
       where: {
         userId_productId: {
-          userId: session.user.id,
+          userId: user.id,
           productId,
         },
       },
       update: { rating, comment: comment || null },
       create: {
-        userId: session.user.id,
+        userId: user.id,
         productId,
         rating,
         comment: comment || null,

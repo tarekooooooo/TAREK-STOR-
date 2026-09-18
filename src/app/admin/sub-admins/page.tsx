@@ -19,6 +19,7 @@ interface SubAdmin {
     manageSettings: boolean;
     viewRevenue: boolean;
     manageWallets: boolean;
+    manageSupport: boolean;
   } | null;
 }
 
@@ -32,6 +33,7 @@ const permissionLabels: Record<string, string> = {
   manageSettings: "إدارة الإعدادات",
   viewRevenue: "عرض الإيرادات",
   manageWallets: "إدارة المحافظ",
+  manageSupport: "خدمة العملاء",
 };
 
 export default function AdminSubAdminsPage() {
@@ -52,6 +54,7 @@ export default function AdminSubAdminsPage() {
     manageSettings: false,
     viewRevenue: false,
     manageWallets: false,
+    manageSupport: false,
   });
   const [saving, setSaving] = useState(false);
 
